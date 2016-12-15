@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:aop="http://www.springframework.org/schema/aop" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jee="http://www.springframework.org/schema/jee"
+	xsi:schemaLocation="http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.2.xsd
+		http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-4.2.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.2.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.2.xsd 
+		http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee.xsd"
+	default-lazy-init="true" default-autowire="byName">
+	<!-- 读取hibernate.properties 配置文件 -->
+	<description>加载资源文件</description>
+
+	<bean
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="systemPropertiesModeName" value="SYSTEM_PROPERTIES_MODE_OVERRIDE" />
+		<property name="ignoreResourceNotFound" value="true" />
+		<property name="locations">
+			<list>
+				<value>classpath:jdbc.properties</value>
+			</list>
+		</property>
+	</bean>
+
+	<!-- 数据源 -->
+	<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource"
+		destroy-method="close">
+		<property name="driverClass" value="${${currentDatabase}DriverClassName}" />
+		<property name="jdbcUrl" value="${${currentDatabase}URL}" />
+		<property name="user" value="${hibernate.connection.username}" />
+		<property name="password" value="${hibernate.connection.password}" />
+
+		<!-- 配置 -->
+		<!-- 其他配置 -->
+		<!--初始化时获取三个连接，取值应在minPoolSize与maxPoolSize之间。Default: 3 -->
+		<property name="initialPoolSize" value="3"></property>
+		<!--连接池中保留的最小连接数。Default: 3 -->
+		<property name="minPoolSize" value="3"></property>
+		<!--连接池中保留的最大连接数。Default: 15 -->
+		<property name="maxPoolSize" value="200"></property>
+		<!--当连接池中的连接耗尽的时候c3p0一次同时获取的连接数。Default: 3 -->
+		<property name="acquireIncrement" value="3"></property>
+		<!-- 控制数据源内加载的PreparedStatements数量。
+		如果maxStatements与maxStatementsPerConnection均为0，则缓存被关闭。Default:  0 -->
+		<property name="maxStatements" value="8"></property>
+		<!--maxStatementsPerConnection定义了连接池内单个连接所拥有的最大缓存statements数。Default: 0 -->
+		<property name="maxStatementsPerConnection" value="5"></property>
+		<!--最大空闲时间,1800秒内未使用则连接被丢弃。若为0则永不丢弃。Default: 0 -->
+		<property name="maxIdleTime" value="1800"></property>
+	</bean>
+
+	<!-- sessionFactory -->
+	<bean id="sessionFactory"
+		class="org.springframework.orm.hibernate4.LocalSessionFactoryBean">
+		<!-- 引用的数据湖 -->
+		<property name="dataSource" ref="dataSource" />
+		<property name="hibernateProperties">
+			<props>
+				<!-- 方言 -->
+				<prop key="hibernate.dialect">${${currentDatabase}Dialect}</prop>
+				<!-- session -->
+				<prop key="hibernate.current_session_context_class">
+					org.springframework.orm.hibernate4.SpringSessionContext
+				</prop>
+				<!-- 后台输出SQL语句 -->
+				<prop key="hibernate.show_sql">true</prop>
+				<!-- 后台输出SQL语句时格式化 -->
+				<prop key="hibernate.format_sql">false</prop>
+				<!-- 数据库表的操作 -->
+				<prop key="hibernate.hbm2ddl.auto">update</prop>
+				<!-- INFO: HHH000424: Disabling contextual LOB creation as createClob() 
+					method threw error : -->
+				<prop key="hibernate.temp.use_jdbc_metadata_defaults">false</prop>
+
+				<!-- 二级缓存 -->
+				<prop key="hibernate.cache.use_second_level_cache">true</prop>
+				<!-- 查询缓存 -->
+				<prop key="hibernate.cache.use_query_cache">true</prop>
+				<!-- 缓存工厂 -->
+				<prop key="hibernate.cache.region.factory_class">org.hibernate.cache.ehcache.EhCacheRegionFactory
+				</prop>
+				<!-- 所需的类 -->
+				<prop key="hibernate.cache.provider_class">org.hibernate.cache.ehcache.EhCacheRegionFactory
+				</prop>
+
+
+			</props>
+		</property>
+		<!-- 自动扫描的包 -->
+		<property name="packagesToScan" value="org.james.project.entity" />
+	</bean>
+   
+	<!-- hibernate4 事务管理 -->
+	<bean id="transactionManager"
+		class="org.springframework.orm.hibernate4.HibernateTransactionManager">
+		<property name="sessionFactory" ref="sessionFactory" />
+	</bean>
+  <!-- 扫描有注解的文件  base-package 包路径 -->
+    <context:component-scan base-package="org.james.project.dao.impl"/>
+   <tx:advice id="txAdvice" transaction-manager="transactionManager">
+        <tx:attributes>
+            <!-- 事务执行方式
+                REQUIRED：指定当前方法必需在事务环境中运行，
+                如果当前有事务环境就加入当前正在执行的事务环境，
+                如果当前没有事务，就新建一个事务。
+                这是默认值。 
+             -->
+            <tx:method name="create*" propagation="REQUIRED" />
+            <tx:method name="save*" propagation="REQUIRED" />
+            <tx:method name="add*" propagation="REQUIRED" />
+            <tx:method name="update*" propagation="REQUIRED" />
+            <tx:method name="remove*" propagation="REQUIRED" />
+            <tx:method name="del*" propagation="REQUIRED" />
+            <tx:method name="import*" propagation="REQUIRED" />
+            <!-- 
+                指定当前方法以非事务方式执行操作，如果当前存在事务，就把当前事务挂起，等我以非事务的状态运行完，再继续原来的事务。 
+                查询定义即可
+                read-only="true"  表示只读
+             -->
+            <tx:method name="*" propagation="NOT_SUPPORTED" read-only="true" />
+        </tx:attributes>
+    </tx:advice>
+
+    <!-- 定义切面，在 * tdxy.*.service.*ServiceImpl.*(..) 中执行有关的hibernate session的事务操作 -->
+    <aop:config>
+        <aop:pointcut id="serviceOperation" expression="execution(* org.james.project.dao.impl.*.*(..))" />
+        <aop:advisor advice-ref="txAdvice" pointcut-ref="serviceOperation" />
+    </aop:config>
+
+
+
+	<!-- 通过注解来管理事务 
+	<tx:annotation-driven transaction-manager="transactionManager" proxy-target-class="true" />
+	<context:annotation-config />
+	<context:component-scan base-package="org.james.*.*"
+		annotation-config="true" />
+
+	<aop:aspectj-autoproxy  />
+-->
+	<bean id="multipartResolver"
+		class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+		<property name="defaultEncoding" value="UTF-8" />
+		<property name="maxInMemorySize" value="20960" />
+		<property name="maxUploadSize" value="20971520" />
+		<property name="uploadTempDir" value="/upload/images/" />
+	</bean>
+
+
+
+</beans>
